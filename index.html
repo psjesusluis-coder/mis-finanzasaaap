@@ -119,49 +119,63 @@
         .nav-item.active { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; }
         .nav-item i { font-size: 20px; }
         .nav-item span { font-size: 10px; font-weight: 600; }
+        
+        /* MODAL STYLES */
         .modal {
             display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); z-index: 1000; align-items: flex-end; justify-content: center;
+            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: var(--card); border-radius: 25px 25px 0 0; width: 100%;
-            max-width: 480px; padding: 25px; animation: slideUp 0.3s ease;
-            max-height: 90vh; overflow-y: auto;
+            background: var(--card); border-radius: 20px; width: 95%;
+            max-width: 450px; padding: 25px; animation: slideUp 0.3s ease;
+            max-height: 95vh; overflow-y: auto;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-header h3 { font-size: 20px; color: var(--text); }
-        .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); }
+        .modal-header h3 { font-size: 22px; color: var(--text); font-weight: 700; }
+        .close-btn { background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-light); }
+        
+        /* Category Tabs */
+        .category-tabs { display: flex; gap: 10px; margin-bottom: 20px; background: var(--bg); border-radius: 12px; padding: 4px; }
+        .category-tab {
+            flex: 1; padding: 12px; border: none; background: transparent;
+            color: var(--text-light); border-radius: 10px; cursor: pointer;
+            font-weight: 600; font-size: 14px; transition: all 0.3s;
+        }
+        .category-tab.active { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(102,126,234,0.3); }
+        
+        /* Form */
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; color: var(--text-light); font-size: 14px; font-weight: 600; }
-        .form-group input, .form-group select {
-            width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 12px;
+        .form-group label { display: block; margin-bottom: 6px; color: var(--text); font-size: 14px; font-weight: 600; }
+        .form-group input {
+            width: 100%; padding: 14px; border: 2px solid var(--border); border-radius: 12px;
             font-size: 16px; background: var(--bg); color: var(--text);
         }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--primary); }
-        .btn-primary {
-            width: 100%; padding: 15px;
+        .form-group input:focus { outline: none; border-color: var(--primary); background: white; }
+        
+        /* Category Grid */
+        .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; max-height: 320px; overflow-y: auto; padding: 5px; }
+        .category-option {
+            padding: 14px 8px; border: 2px solid var(--border); border-radius: 12px;
+            text-align: center; cursor: pointer; transition: all 0.2s; background: white;
+        }
+        .category-option:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .category-option.selected { border-color: var(--primary); background: rgba(102, 126, 234, 0.08); }
+        .category-option i { font-size: 22px; display: block; margin-bottom: 6px; }
+        .category-option span { font-size: 10px; display: block; font-weight: 600; color: var(--text); text-transform: uppercase; }
+        
+        /* Save Button */
+        .btn-save {
+            width: 100%; padding: 16px;
             background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white; border: none; border-radius: 12px; font-size: 16px;
-            font-weight: bold; cursor: pointer; margin-top: 10px;
+            font-weight: bold; cursor: pointer; margin-top: 15px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: 0 4px 12px rgba(102,126,234,0.4);
         }
-        .category-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
-        .category-tab {
-            flex: 1; padding: 12px; border: none; background: var(--bg);
-            color: var(--text-light); border-radius: 10px; cursor: pointer;
-            font-weight: 600; transition: all 0.2s;
-        }
-        .category-tab.active { background: var(--primary); color: white; }
-        .category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
-        .category-option {
-            padding: 10px; border: 2px solid var(--border); border-radius: 10px;
-            text-align: center; cursor: pointer; transition: all 0.2s;
-        }
-        .category-option:hover { transform: translateY(-2px); }
-        .category-option.selected { border-color: var(--primary); background: rgba(102, 126, 234, 0.1); }
-        .category-option i { font-size: 20px; display: block; margin-bottom: 5px; }
-        .category-option span { font-size: 10px; display: block; }
+        .btn-save:active { transform: scale(0.98); }
+        
         .empty-state { text-align: center; padding: 40px 20px; color: var(--text-light); }
         .empty-state i { font-size: 64px; margin-bottom: 15px; opacity: 0.3; }
         .tab-content { display: none; }
@@ -182,8 +196,8 @@
             <div class="amount" id="mainBalance">S/ 0.00</div>
         </div>
         <div class="sub-cards">
-            <div class="sub-card income"><h3>Ingresos</h3><div class="amount" id="totalIncome">S/ 0.00</div></div>
-            <div class="sub-card expense"><h3>Gastos</h3><div class="amount" id="totalExpense">S/ 0.00</div></div>
+            <div class="sub-card income"><h3>Ingresos (Hoy)</h3><div class="amount" id="totalIncome">S/ 0.00</div></div>
+            <div class="sub-card expense"><h3>Gastos (Hoy)</h3><div class="amount" id="totalExpense">S/ 0.00</div></div>
             <div class="sub-card budget"><h3>Presupuesto</h3><div class="amount" id="remainingBudget">S/ 0.00</div></div>
             <div class="sub-card"><h3>Corte</h3><div class="amount" style="font-size: 16px; color: var(--primary);" id="cutOffDay">Día 17</div></div>
         </div>
@@ -205,7 +219,7 @@
     </div>
 
     <div class="recent-section" id="recentSection">
-        <div class="section-header"><h3>📋 Últimos Movimientos</h3></div>
+        <div class="section-header"><h3> Últimos Movimientos</h3></div>
         <div id="recentTransactions"><div class="empty-state"><i class="fas fa-receipt"></i><p>No hay movimientos registrados aún. ¡Usa el micrófono! 🎙️</p></div></div>
     </div>
 
@@ -242,7 +256,7 @@
 
     <div class="tab-content" id="settingsTab">
         <div class="recent-section">
-            <h3>️ Configuración</h3>
+            <h3>⚙️ Configuración</h3>
             <div class="form-group" style="margin-top: 15px;">
                 <label>Día de Corte Mensual (1-28)</label>
                 <input type="number" id="cutOffInput" min="1" max="28" value="17">
@@ -251,33 +265,52 @@
                 <label>Presupuesto Mensual (S/)</label>
                 <input type="number" id="budgetInput" value="2000">
             </div>
-            <button class="btn-primary" onclick="saveSettings()">Guardar Configuración</button>
-            <button class="btn-primary" style="background: var(--danger); margin-top: 10px;" onclick="clearAllData()"><i class="fas fa-trash"></i> Borrar todos los datos</button>
+            <button class="btn-save" onclick="saveSettings()"><i class="fas fa-save"></i> Guardar Configuración</button>
+            <button class="btn-save" style="background: var(--danger); margin-top: 10px;" onclick="clearAllData()"><i class="fas fa-trash"></i> Borrar todos los datos</button>
         </div>
     </div>
 </div>
 
+<!-- MODAL -->
 <div class="modal" id="transactionModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 id="modalTitle">Nuevo Movimiento</h3>
+            <h3 id="modalTitle">Nuevo Gasto</h3>
             <button class="close-btn" onclick="closeModal()">&times;</button>
         </div>
+        
         <div class="category-tabs">
             <button class="category-tab active" onclick="switchCategoryType('expense')" id="tabExpense">Gastos</button>
             <button class="category-tab" onclick="switchCategoryType('income')" id="tabIncome">Ingresos</button>
         </div>
+
         <form id="transactionForm">
             <input type="hidden" id="editId" value="">
-            <div class="form-group"><label>Monto (S/)</label><input type="number" step="0.01" id="txAmount" placeholder="0.00" required></div>
+            
+            <div class="form-group">
+                <label>Monto (S/)</label>
+                <input type="number" step="0.01" id="txAmount" placeholder="0.00" required>
+            </div>
+
+            <div class="form-group">
+                <label>Fecha</label>
+                <input type="date" id="txDate" required>
+            </div>
+
+            <div class="form-group">
+                <label>Detalle / Nota</label>
+                <input type="text" id="txNote" placeholder="Ej: Almuerzo, taxi, etc.">
+            </div>
+
             <div class="form-group">
                 <label>Categoría</label>
                 <div class="category-grid" id="categoryGrid"></div>
-                <input type="hidden" id="txCategory" value="Otros">
+                <input type="hidden" id="txCategory" value="OTROS">
             </div>
-            <div class="form-group"><label>Fecha</label><input type="date" id="txDate" required></div>
-            <div class="form-group"><label>Detalle / Nota</label><input type="text" id="txNote" placeholder="Ej: Almuerzo, taxi, etc."></div>
-            <button type="submit" class="btn-primary" id="submitBtn"><i class="fas fa-save"></i> 💾 Guardar Movimiento</button>
+
+            <button type="submit" class="btn-save" id="submitBtn">
+                <i class="fas fa-save"></i> 💾 Guardar Movimiento
+            </button>
         </form>
     </div>
 </div>
@@ -373,14 +406,13 @@ function selectCategory(name) {
 function openModal(type, editId = null) {
     document.getElementById('transactionModal').classList.add('active');
     document.getElementById('modalTitle').textContent = editId ? 'Editar Movimiento' : (type === 'income' ? 'Nuevo Ingreso' : 'Nuevo Gasto');
-    document.getElementById('submitBtn').innerHTML = editId ? '<i class="fas fa-save"></i> Actualizar' : '<i class="fas fa-save"></i> 💾 Guardar Movimiento';
+    document.getElementById('submitBtn').innerHTML = editId ? '<i class="fas fa-save"></i> Actualizar Movimiento' : '<i class="fas fa-save"></i> 💾 Guardar Movimiento';
     document.getElementById('editId').value = editId || '';
     switchCategoryType(type);
     if (editId) {
         const tx = transactions.find(t => t.id === parseInt(editId));
         if (tx) {
             document.getElementById('txAmount').value = tx.amount;
-            document.getElementById('txCategory').value = tx.category;
             document.getElementById('txDate').value = tx.date;
             document.getElementById('txNote').value = tx.note || '';
             switchCategoryType(tx.type);
@@ -388,6 +420,7 @@ function openModal(type, editId = null) {
                 document.querySelectorAll('.category-option').forEach(o => {
                     o.classList.toggle('selected', o.dataset.category === tx.category);
                 });
+                document.getElementById('txCategory').value = tx.category;
             }, 100);
         }
     } else {
@@ -616,7 +649,7 @@ function clearAllData() {
     if (confirm('¿Estás seguro de borrar todos los datos?')) {
         transactions = [];
         localStorage.setItem('transactions', JSON.stringify(transactions));
-        renderAll(); showNotification('🗑️ Datos eliminados');
+        renderAll(); showNotification('️ Datos eliminados');
     }
 }
 
@@ -631,7 +664,6 @@ function exportToExcel() {
     showNotification('📊 Excel descargado');
 }
 
-function formatDate(dateStr) { const [y, m, d] = dateStr.split('-'); return `${d}/${m}/${y.slice(2)}`; }
 function showNotification(message) {
     const div = document.createElement('div');
     div.textContent = message;
