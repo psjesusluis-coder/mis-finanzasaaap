@@ -74,6 +74,11 @@ body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh
 .legend-right b{color:var(--text);margin-right:6px}
 .chart-container{position:relative;height:240px;margin-top:10px}
 
+.cat-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cat-detail-head h3{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text)}
+.cat-detail-head .clear-btn{padding:6px 12px;border:none;border-radius:10px;background:var(--bg);color:var(--text-light);font-size:12px;cursor:pointer}
+.cat-detail-total{font-size:13px;color:var(--text-light);margin-bottom:8px}
+
 .table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{background:var(--primary);color:#fff;padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap}
@@ -206,9 +211,25 @@ th.r,td.r{text-align:right}
       </div>
       <div class="legend" id="legend"></div>
     </div>
+
     <div class="card">
       <h3>Ingresos vs gastos (últimos 6 ciclos)</h3>
       <div class="chart-container"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <!-- Movimientos de la categoría seleccionada -->
+    <div class="card" id="catDetailCard" style="display:none">
+      <div class="cat-detail-head">
+        <h3 id="catDetailTitle"></h3>
+        <button class="clear-btn" onclick="clearCategoryFilter()"><i class="fas fa-xmark"></i> Quitar</button>
+      </div>
+      <div class="cat-detail-total" id="catDetailTotal"></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Día</th><th>Detalle</th><th class="r">Monto</th><th></th></tr></thead>
+          <tbody id="catDetailBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -290,6 +311,7 @@ let settings = JSON.parse(localStorage.getItem('settings') || '{"cutOffDay":17,"
 let currentCategoryType = 'expense';
 let categoryChart = null, trendChart = null, recognition = null, isListening = false;
 let activeLegendIdx = null;
+let selectedCategory = null;          // categoría elegida en Estadísticas
 let viewYear = null, viewMonth = null; // mes en que EMPIEZA el ciclo que se ve (0-11)
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -365,9 +387,7 @@ function loadSettings(){
 // ==================== FECHAS Y CICLOS ====================
 function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-// Ciclo de facturación: del día de corte de un mes al día de corte del siguiente.
-// Se nombra por el mes en que empieza: "Octubre" = 17/10 → 16/11 (el 17/11 empieza el siguiente).
-// Para que el ciclo sea 17→17 inclusive se usa end = día de corte del mes siguiente, excluido.
+// Ciclo que empieza en el día de corte de (startY, startM) y termina el día antes del corte siguiente
 function cycleOf(startY, startM){
   const c = settings.cutOffDay;
   const start = new Date(startY, startM, c);
@@ -382,8 +402,7 @@ function cutPeriod(refDate){
   let y = refDate.getFullYear(), m = refDate.getMonth();
   if (refDate.getDate() < c) m--;
   if (m < 0) { m += 12; y--; }
-  const p = cycleOf(y, m);
-  return { ...p, startDate: new Date(y, m, c) };
+  return cycleOf(y, m);
 }
 
 function getRange(){
@@ -571,6 +590,7 @@ function renderAll(){
   renderHistory(r);
   renderDonut(r);
   renderTrend();
+  renderCategoryDetail(r);
 }
 
 function renderBalance(r){
@@ -601,7 +621,7 @@ function renderHistory(r){
     : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)">No hay movimientos en este ciclo.</td></tr>';
 }
 
-// Fila de tabla: Día | Categoría | Detalle | Monto [| acciones]
+// Fila: Día | Categoría | Detalle | Monto [| acciones]
 function rowHTML(tx, actions = false){
   const cats = tx.type === 'income' ? incomeCategories : expenseCategories;
   const c = cats[tx.category] || { icon: 'fa-box', color: '#6b7280' };
@@ -640,35 +660,71 @@ function renderDonut(r){
         legend: { display: false },
         tooltip: { callbacks: { label: ctx => ` S/ ${ctx.parsed.toFixed(2)} (${(ctx.parsed / total * 100).toFixed(1)}%)` } }
       },
-      onClick: (_, els) => { if (els.length) highlight(els[0].index); }
+      onClick: (_, els) => { if (els.length) selectCategoryFilter(labels[els[0].index]); }
     }
   });
 
   document.getElementById('legend').innerHTML = labels.length ? labels.map((l, i) => {
     const pct = (values[i] / total * 100).toFixed(1);
-    return `<div class="legend-item" data-i="${i}" onclick="highlight(${i})">
+    return `<div class="legend-item" data-i="${i}" onclick="selectCategoryFilter('${l.replace(/'/g,"\\'")}')">
       <div class="legend-left"><span class="legend-dot" style="background:${colors[i]}"></span>${l}</div>
       <div class="legend-right"><b>${pct}%</b>S/ ${values[i].toFixed(2)}</div></div>`;
   }).join('') : '<p style="text-align:center;color:var(--text-light);padding:15px">Sin gastos en este ciclo</p>';
 }
 
-function highlight(i){
+// Al tocar una categoría (dona o leyenda): se guarda el filtro y se resalta
+function selectCategoryFilter(name){
+  selectedCategory = selectedCategory === name ? null : name;
+  highlightSelected();
+  renderCategoryDetail(getRange());
+}
+
+function highlightSelected(){
   if (!categoryChart) return;
-  activeLegendIdx = activeLegendIdx === i ? null : i;
+  const labels = categoryChart.data.labels;
+  const idx = selectedCategory === null ? null : labels.indexOf(selectedCategory);
   const ds = categoryChart.data.datasets[0];
-  const total = ds.data.reduce((s,v) => s + v, 0);
   ds.backgroundColor = ds.data.map((_, j) => {
     const base = VIVID[j % VIVID.length];
-    return (activeLegendIdx === null || j === activeLegendIdx) ? base : base + '40';
+    return (idx === null || j === idx) ? base : base + '40';
   });
   categoryChart.update();
   document.querySelectorAll('.legend-item').forEach((el, j) => {
-    el.classList.toggle('active', j === activeLegendIdx);
-    el.classList.toggle('dim', activeLegendIdx !== null && j !== activeLegendIdx);
+    el.classList.toggle('active', j === idx);
+    el.classList.toggle('dim', idx !== null && j !== idx);
   });
-  document.getElementById('donutTotal').textContent = activeLegendIdx === null
+  const total = ds.data.reduce((s,v) => s + v, 0);
+  document.getElementById('donutTotal').textContent = idx === null
     ? `S/ ${total.toFixed(2)}`
-    : `S/ ${ds.data[activeLegendIdx].toFixed(2)}`;
+    : `S/ ${ds.data[idx].toFixed(2)}`;
+}
+
+function clearCategoryFilter(){
+  selectedCategory = null;
+  highlightSelected();
+  renderCategoryDetail(getRange());
+}
+
+// Movimientos de la categoría seleccionada, debajo de Ingresos vs gastos
+function renderCategoryDetail(r){
+  const card = document.getElementById('catDetailCard');
+  if (!selectedCategory) { card.style.display = 'none'; return; }
+  const list = transactions
+    .filter(t => t.type === 'expense' && t.category === selectedCategory && inRange(t, r))
+    .sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
+  const total = list.reduce((s,t) => s + t.amount, 0);
+  const c = expenseCategories[selectedCategory] || { icon: 'fa-box', color: '#6b7280' };
+  card.style.display = 'block';
+  document.getElementById('catDetailTitle').innerHTML = `<i class="fas ${c.icon}" style="color:${c.color}"></i> ${selectedCategory}`;
+  document.getElementById('catDetailTotal').textContent = `${list.length} movimiento(s) · Total S/ ${total.toFixed(2)}`;
+  document.getElementById('catDetailBody').innerHTML = list.length
+    ? list.map(t => `<tr>
+        <td>${t.date.split('-')[2]}</td>
+        <td><div class="detail-cell" title="${(t.note || '').replace(/"/g,'&quot;')}">${t.note || '-'}</div></td>
+        <td class="r"><span class="amount-cell expense">- S/ ${t.amount.toFixed(2)}</span></td>
+        <td><button class="btn-edit" onclick="openModal('expense', ${t.id})"><i class="fas fa-edit"></i></button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">Sin movimientos en este ciclo.</td></tr>';
 }
 
 // Últimos 6 ciclos terminando en el que se está viendo
