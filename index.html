@@ -76,20 +76,22 @@ body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh
 
 .table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid var(--border)}
 table{width:100%;border-collapse:collapse;font-size:12px}
-th{background:var(--primary);color:#fff;padding:10px 6px;text-align:left;font-size:10px;text-transform:uppercase}
-td{padding:10px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+th{background:var(--primary);color:#fff;padding:10px 8px;text-align:left;font-size:10px;text-transform:uppercase;white-space:nowrap}
+td{padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
 tr:nth-child(even){background:#f9fafb}
+th.r,td.r{text-align:right}
 .amount-cell{font-weight:bold;font-size:13px;white-space:nowrap}
 .amount-cell.income{color:var(--success)}
 .amount-cell.expense{color:var(--danger)}
 .cat-cell{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;white-space:nowrap}
-.btn-edit,.btn-delete{padding:4px 8px;color:#fff;border:none;border-radius:6px;font-size:10px;cursor:pointer}
+.cat-cell i{font-size:13px}
+.detail-cell{font-size:11px;color:var(--text-light);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-edit,.btn-delete{padding:4px 7px;color:#fff;border:none;border-radius:6px;font-size:10px;cursor:pointer}
 .btn-edit{background:var(--primary);margin-right:4px}
 .btn-delete{background:var(--danger)}
 .export-btn{padding:8px 14px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:12px;cursor:pointer}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .section-header h3{font-size:16px;color:var(--text)}
-.mov-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-radius:25px 25px 0 0;padding:12px 20px;display:flex;justify-content:space-around;box-shadow:0 -4px 15px rgba(0,0,0,.1);z-index:100}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:5px 12px;border-radius:12px;color:var(--text-light);transition:all .3s}
@@ -131,20 +133,19 @@ tr:nth-child(even){background:#f9fafb}
 <body>
 <div class="container">
 
-  <!-- BARRA SUPERIOR: modo + navegación por mes -->
   <div class="top-bar">
     <h1><i class="fas fa-wallet"></i> Mis Finanzas</h1>
     <select class="mode-select" id="modeSelect" onchange="onModeChange()">
-      <option value="month">Por mes (período de corte)</option>
+      <option value="month">Ciclo de facturación (corte día 17)</option>
       <option value="custom">Personalizado</option>
     </select>
     <div class="month-nav" id="monthNav">
-      <button onclick="shiftMonth(-1)" aria-label="Mes anterior"><i class="fas fa-chevron-left"></i></button>
+      <button onclick="shiftMonth(-1)" aria-label="Ciclo anterior"><i class="fas fa-chevron-left"></i></button>
       <div class="month-info">
         <strong id="monthTitle">—</strong>
         <small id="monthSub">—</small>
       </div>
-      <button onclick="shiftMonth(1)" aria-label="Mes siguiente"><i class="fas fa-chevron-right"></i></button>
+      <button onclick="shiftMonth(1)" aria-label="Ciclo siguiente"><i class="fas fa-chevron-right"></i></button>
     </div>
     <div class="custom-range" id="customRange">
       <input type="date" id="customFrom" onchange="renderAll()">
@@ -152,11 +153,10 @@ tr:nth-child(even){background:#f9fafb}
     </div>
   </div>
 
-  <!-- INICIO -->
   <div id="homeTab">
     <div class="card">
       <div class="main-balance">
-        <h2>Saldo del período</h2>
+        <h2>Saldo del ciclo</h2>
         <div class="amount" id="mainBalance">S/ 0.00</div>
       </div>
       <div class="sub-cards">
@@ -185,11 +185,15 @@ tr:nth-child(even){background:#f9fafb}
 
     <div class="card">
       <div class="section-header"><h3>Últimos movimientos</h3></div>
-      <div id="recentTransactions"></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Día</th><th>Categoría</th><th>Detalle</th><th class="r">Monto</th></tr></thead>
+          <tbody id="recentTransactions"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- ESTADÍSTICAS -->
   <div class="tab-content" id="statsTab">
     <div class="card">
       <h3>Gastos por categoría</h3>
@@ -203,28 +207,26 @@ tr:nth-child(even){background:#f9fafb}
       <div class="legend" id="legend"></div>
     </div>
     <div class="card">
-      <h3>Ingresos vs gastos (últimos 6 períodos)</h3>
+      <h3>Ingresos vs gastos (últimos 6 ciclos)</h3>
       <div class="chart-container"><canvas id="trendChart"></canvas></div>
     </div>
   </div>
 
-  <!-- MOVIMIENTOS -->
   <div class="tab-content" id="historyTab">
     <div class="card">
       <div class="section-header">
-        <h3>Movimientos del período</h3>
+        <h3>Movimientos del ciclo</h3>
         <button class="export-btn" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> Excel</button>
       </div>
       <div class="table-wrapper">
         <table>
-          <thead><tr><th>Fecha</th><th>Monto</th><th>Categoría</th><th>Detalle</th><th></th></tr></thead>
+          <thead><tr><th>Día</th><th>Categoría</th><th>Detalle</th><th class="r">Monto</th><th></th></tr></thead>
           <tbody id="fullTransactions"></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- AJUSTES -->
   <div class="tab-content" id="settingsTab">
     <div class="card">
       <h3>Configuración</h3>
@@ -242,7 +244,6 @@ tr:nth-child(even){background:#f9fafb}
   </div>
 </div>
 
-<!-- MODAL -->
 <div class="modal" id="transactionModal">
   <div class="modal-content">
     <div class="modal-header">
@@ -289,7 +290,7 @@ let settings = JSON.parse(localStorage.getItem('settings') || '{"cutOffDay":17,"
 let currentCategoryType = 'expense';
 let categoryChart = null, trendChart = null, recognition = null, isListening = false;
 let activeLegendIdx = null;
-let viewYear = null, viewMonth = null; // mes de CIERRE que se está viendo (0-11)
+let viewYear = null, viewMonth = null; // mes en que EMPIEZA el ciclo que se ve (0-11)
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -343,10 +344,9 @@ const VOICE_CATS = [
 
 // ==================== INICIO ====================
 document.addEventListener('DOMContentLoaded', () => {
-  const now = new Date();
-  const p = cutPeriod(now);
-  viewYear = p.closeDate.getFullYear();
-  viewMonth = p.closeDate.getMonth();
+  const p = cutPeriod(new Date());
+  viewYear = p.startDate.getFullYear();
+  viewMonth = p.startDate.getMonth();
   loadSettings();
   initVoice();
   document.getElementById('txDate').valueAsDate = new Date();
@@ -362,29 +362,28 @@ function loadSettings(){
   document.getElementById('cutOffDay').textContent = `Día ${settings.cutOffDay}`;
 }
 
-// ==================== FECHAS Y PERÍODOS ====================
+// ==================== FECHAS Y CICLOS ====================
 function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-// Período que contiene refDate: (corte del mes anterior + 1) → corte del mes de cierre
+// Ciclo de facturación: del día de corte de un mes al día de corte del siguiente.
+// Se nombra por el mes en que empieza: "Octubre" = 17/10 → 16/11 (el 17/11 empieza el siguiente).
+// Para que el ciclo sea 17→17 inclusive se usa end = día de corte del mes siguiente, excluido.
+function cycleOf(startY, startM){
+  const c = settings.cutOffDay;
+  const start = new Date(startY, startM, c);
+  const next = new Date(startY, startM + 1, c);
+  const endIncl = new Date(next); endIncl.setDate(endIncl.getDate() - 1);
+  return { start: ymd(start), end: ymd(endIncl), startDate: start, endDate: next };
+}
+
+// Ciclo que contiene una fecha
 function cutPeriod(refDate){
   const c = settings.cutOffDay;
   let y = refDate.getFullYear(), m = refDate.getMonth();
-  if (refDate.getDate() > c) { m++; if (m > 11) { m = 0; y++; } }
-  return {
-    start: ymd(new Date(y, m - 1, c + 1)),
-    end: ymd(new Date(y, m, c)),
-    closeDate: new Date(y, m, c)
-  };
-}
-
-// Período de un mes de cierre concreto (y, m)
-function periodOfClose(y, m){
-  const c = settings.cutOffDay;
-  return {
-    start: ymd(new Date(y, m - 1, c + 1)),
-    end: ymd(new Date(y, m, c)),
-    closeDate: new Date(y, m, c)
-  };
+  if (refDate.getDate() < c) m--;
+  if (m < 0) { m += 12; y--; }
+  const p = cycleOf(y, m);
+  return { ...p, startDate: new Date(y, m, c) };
 }
 
 function getRange(){
@@ -392,14 +391,14 @@ function getRange(){
   if (mode === 'custom') {
     const from = document.getElementById('customFrom').value;
     const to = document.getElementById('customTo').value;
-    return { start: from || '0000-01-01', end: to || '9999-12-31', closeDate: new Date(to || Date.now()), custom: true };
+    return { start: from || '0000-01-01', end: to || '9999-12-31', startDate: new Date(from || Date.now()), custom: true };
   }
-  return periodOfClose(viewYear, viewMonth);
+  return cycleOf(viewYear, viewMonth);
 }
 
 function inRange(t, r){ return t.date >= r.start && t.date <= r.end; }
 
-// ==================== NAVEGACIÓN POR MES ====================
+// ==================== NAVEGACIÓN ====================
 function shiftMonth(delta){
   const d = new Date(viewYear, viewMonth + delta, 1);
   viewYear = d.getFullYear();
@@ -414,17 +413,17 @@ function onModeChange(){
   renderAll();
 }
 
+function fmtDM(s){ const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
+
 function renderHeader(r){
-  const mode = document.getElementById('modeSelect').value;
-  if (mode === 'custom') {
+  if (document.getElementById('modeSelect').value === 'custom') {
     document.getElementById('monthTitle').textContent = 'Rango personalizado';
-    document.getElementById('monthSub').textContent = `${r.start} → ${r.end}`;
+    document.getElementById('monthSub').textContent = `${fmtDM(r.start)} al ${fmtDM(r.end)}`;
     return;
   }
-  document.getElementById('monthTitle').textContent = `${MONTHS[viewMonth]}, ${viewYear}`;
+  document.getElementById('monthTitle').textContent = MONTHS[viewMonth];
   document.getElementById('monthSub').textContent = `${fmtDM(r.start)} al ${fmtDM(r.end)}`;
 }
-function fmtDM(s){ const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; }
 
 // ==================== VOZ ====================
 function initVoice(){
@@ -584,40 +583,38 @@ function renderBalance(r){
   document.getElementById('remainingBudget').textContent = `S/ ${(settings.budget - expense).toFixed(2)}`;
 }
 
+function sortedIn(r){
+  return transactions.filter(t => inRange(t, r)).sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id);
+}
+
 function renderRecent(r){
-  const list = transactions.filter(t => inRange(t, r))
-    .sort((a,b) => b.date.localeCompare(a.date) || b.id - a.id).slice(0, 5);
+  const list = sortedIn(r).slice(0, 5);
   document.getElementById('recentTransactions').innerHTML = list.length
     ? list.map(t => rowHTML(t)).join('')
-    : '<div class="empty-state"><i class="fas fa-receipt"></i><p>No hay movimientos en este período.</p></div>';
+    : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-light)">No hay movimientos en este ciclo.</td></tr>';
 }
 
 function renderHistory(r){
-  const list = transactions.filter(t => inRange(t, r)).sort((a,b) => b.date.localeCompare(a.date));
+  const list = sortedIn(r);
   document.getElementById('fullTransactions').innerHTML = list.length
     ? list.map(t => rowHTML(t, true)).join('')
-    : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)">No hay movimientos en este período.</td></tr>';
+    : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)">No hay movimientos en este ciclo.</td></tr>';
 }
 
+// Fila de tabla: Día | Categoría | Detalle | Monto [| acciones]
 function rowHTML(tx, actions = false){
   const cats = tx.type === 'income' ? incomeCategories : expenseCategories;
   const c = cats[tx.category] || { icon: 'fa-box', color: '#6b7280' };
-  const date = tx.date.split('-').reverse().join('/');
+  const dia = tx.date.split('-')[2];
   const sign = tx.type === 'income' ? '+' : '-';
   const cls = tx.type === 'income' ? 'income' : 'expense';
-  if (!actions) return `<div class="mov-row">
-      <div><div style="font-size:12px;color:var(--text-light)">${date}</div>
-      <div class="cat-cell"><i class="fas ${c.icon}" style="color:${c.color}"></i>${tx.category}</div></div>
-      <div class="amount-cell ${cls}">${sign} S/ ${tx.amount.toFixed(2)}</div></div>`;
-  return `<tr>
-    <td style="font-size:11px">${date}</td>
-    <td class="amount-cell ${cls}">${sign} S/ ${tx.amount.toFixed(2)}</td>
-    <td><div class="cat-cell"><i class="fas ${c.icon}" style="color:${c.color}"></i>${tx.category}</div></td>
-    <td style="font-size:11px;color:var(--text-light)">${tx.note || '-'}</td>
-    <td>
+  const cat = `<div class="cat-cell"><i class="fas ${c.icon}" style="color:${c.color}"></i>${tx.category}</div>`;
+  const det = `<div class="detail-cell" title="${(tx.note || '').replace(/"/g,'&quot;')}">${tx.note || '-'}</div>`;
+  const monto = `<td class="r"><span class="amount-cell ${cls}">${sign} S/ ${tx.amount.toFixed(2)}</span></td>`;
+  const actionsHTML = actions ? `<td>
       <button class="btn-edit" onclick="openModal('${tx.type}', ${tx.id})"><i class="fas fa-edit"></i></button>
-      <button class="btn-delete" onclick="deleteTransaction(${tx.id})"><i class="fas fa-trash"></i></button>
-    </td></tr>`;
+      <button class="btn-delete" onclick="deleteTransaction(${tx.id})"><i class="fas fa-trash"></i></button></td>` : '';
+  return `<tr><td>${dia}</td><td>${cat}</td><td>${det}</td>${monto}${actionsHTML}</tr>`;
 }
 
 // ==================== GRÁFICOS ====================
@@ -652,10 +649,9 @@ function renderDonut(r){
     return `<div class="legend-item" data-i="${i}" onclick="highlight(${i})">
       <div class="legend-left"><span class="legend-dot" style="background:${colors[i]}"></span>${l}</div>
       <div class="legend-right"><b>${pct}%</b>S/ ${values[i].toFixed(2)}</div></div>`;
-  }).join('') : '<p style="text-align:center;color:var(--text-light);padding:15px">Sin gastos en este período</p>';
+  }).join('') : '<p style="text-align:center;color:var(--text-light);padding:15px">Sin gastos en este ciclo</p>';
 }
 
-// Resalta una categoría: atenúa el resto en dona y leyenda (tocar de nuevo lo quita)
 function highlight(i){
   if (!categoryChart) return;
   activeLegendIdx = activeLegendIdx === i ? null : i;
@@ -675,25 +671,23 @@ function highlight(i){
     : `S/ ${ds.data[activeLegendIdx].toFixed(2)}`;
 }
 
-// Últimos 6 períodos (de cierre) terminando en el mes que se está viendo
+// Últimos 6 ciclos terminando en el que se está viendo
 function renderTrend(){
-  const periods = [];
+  const cycles = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(viewYear, viewMonth - i, 1);
-    const p = periodOfClose(d.getFullYear(), d.getMonth());
-    periods.push({ label: `${MONTHS[d.getMonth()].slice(0,3)} ${String(d.getFullYear()).slice(2)}`, p, income: 0, expense: 0 });
+    const c = cycleOf(d.getFullYear(), d.getMonth());
+    cycles.push({ label: MONTHS[d.getMonth()].slice(0,3) + ' ' + String(d.getFullYear()).slice(2), c, income: 0, expense: 0 });
   }
-  transactions.forEach(t => {
-    periods.forEach(x => { if (inRange(t, x.p)) x[t.type] += t.amount; });
-  });
+  transactions.forEach(t => cycles.forEach(x => { if (inRange(t, x.c)) x[t.type] += t.amount; }));
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById('trendChart'), {
     type: 'bar',
     data: {
-      labels: periods.map(x => x.label),
+      labels: cycles.map(x => x.label),
       datasets: [
-        { label: 'Ingresos', data: periods.map(x => x.income), backgroundColor: '#10b981', borderRadius: 6 },
-        { label: 'Gastos', data: periods.map(x => x.expense), backgroundColor: '#ef4444', borderRadius: 6 }
+        { label: 'Ingresos', data: cycles.map(x => x.income), backgroundColor: '#10b981', borderRadius: 6 },
+        { label: 'Gastos', data: cycles.map(x => x.expense), backgroundColor: '#ef4444', borderRadius: 6 }
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
@@ -733,7 +727,7 @@ function exportToExcel(){
   if (!transactions.length) return notify('⚠️ No hay datos para exportar');
   const r = getRange();
   const list = transactions.filter(t => inRange(t, r)).sort((a,b) => a.date.localeCompare(b.date));
-  if (!list.length) return notify('⚠️ No hay movimientos en este período');
+  if (!list.length) return notify('⚠️ No hay movimientos en este ciclo');
   const data = list.map(t => ({
     'Fecha': t.date, 'Tipo': t.type === 'income' ? 'Ingreso' : 'Gasto',
     'Monto': t.amount, 'Categoría': t.category, 'Detalle': t.note
@@ -741,7 +735,7 @@ function exportToExcel(){
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Finanzas');
-  XLSX.writeFile(wb, `Finanzas_${MONTHS[viewMonth]}_${viewYear}.xlsx`);
+  XLSX.writeFile(wb, `Ciclo_${MONTHS[viewMonth]}_${viewYear}.xlsx`);
   notify('📊 Excel descargado');
 }
 
