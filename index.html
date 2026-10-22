@@ -6,6 +6,7 @@
 <title>Mis Finanzas - Control Total</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif}
@@ -97,6 +98,9 @@ th.r,td.r{text-align:right}
 .export-btn{padding:8px 14px;background:var(--success);color:#fff;border:none;border-radius:10px;font-size:12px;cursor:pointer}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .section-header h3{font-size:16px;color:var(--text)}
+.sync-status{font-size:13px;color:var(--text-light);margin-top:10px;text-align:center;word-break:break-word;line-height:1.4}
+.sync-status.ok{color:var(--success)}
+.sync-status.err{color:var(--danger);font-weight:600}
 
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#fff;border-radius:25px 25px 0 0;padding:12px 20px;display:flex;justify-content:space-around;box-shadow:0 -4px 15px rgba(0,0,0,.1);z-index:100}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:5px 12px;border-radius:12px;color:var(--text-light);transition:all .3s}
@@ -129,7 +133,6 @@ th.r,td.r{text-align:right}
 .voice-preview .preview-row{display:flex;justify-content:space-between;font-size:12px;color:#78350f;margin-bottom:4px}
 
 .empty-state{text-align:center;padding:30px 20px;color:var(--text-light)}
-.empty-state i{font-size:56px;margin-bottom:12px;opacity:.3}
 .tab-content{display:none}
 .tab-content.active{display:block}
 .notification{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:25px;z-index:3000;font-size:14px;font-weight:600;max-width:90%;text-align:center}
@@ -217,7 +220,6 @@ th.r,td.r{text-align:right}
       <div class="chart-container"><canvas id="trendChart"></canvas></div>
     </div>
 
-    <!-- Movimientos de la categoría seleccionada -->
     <div class="card" id="catDetailCard" style="display:none">
       <div class="cat-detail-head">
         <h3 id="catDetailTitle"></h3>
@@ -260,7 +262,15 @@ th.r,td.r{text-align:right}
         <input type="number" id="budgetInput" value="2000">
       </div>
       <button class="btn-save" onclick="saveSettings()"><i class="fas fa-save"></i> Guardar configuración</button>
-      <button class="btn-save" style="background:var(--danger);margin-top:10px" onclick="clearAllData()"><i class="fas fa-trash"></i> Borrar todos los datos</button>
+    </div>
+    <div class="card">
+      <h3><i class="fab fa-google-drive"></i> Google Drive</h3>
+      <p style="font-size:12px;color:var(--text-light);margin-bottom:12px">Los datos se guardan en el archivo <b>finanzas.json</b> de tu Drive. Usa la misma cuenta de Google en la PC y en el celular.</p>
+      <button class="btn-save" onclick="connectDrive()"><i class="fab fa-google"></i> Conectar con Google</button>
+      <div class="sync-status" id="syncStatus">Sin conexión a Drive</div>
+    </div>
+    <div class="card">
+      <button class="btn-save" style="background:var(--danger);margin-top:0" onclick="clearAllData()"><i class="fas fa-trash"></i> Borrar todos los datos</button>
     </div>
   </div>
 </div>
@@ -305,14 +315,19 @@ th.r,td.r{text-align:right}
 </div>
 
 <script>
+// ==================== CONFIGURACIÓN GOOGLE ====================
+const GOOGLE_CLIENT_ID = '844875373883-uc6caon65gp3oavcfmjcnko5c9offag3.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILE = 'finanzas.json';
+
 // ==================== DATOS ====================
 let transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
 let settings = JSON.parse(localStorage.getItem('settings') || '{"cutOffDay":17,"budget":2000}');
 let currentCategoryType = 'expense';
 let categoryChart = null, trendChart = null, recognition = null, isListening = false;
-let activeLegendIdx = null;
-let selectedCategory = null;          // categoría elegida en Estadísticas
-let viewYear = null, viewMonth = null; // mes en que EMPIEZA el ciclo que se ve (0-11)
+let selectedCategory = null;
+let viewYear = null, viewMonth = null;
+let tokenClient = null, accessToken = null, driveFileId = null, saveTimer = null;
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -330,6 +345,8 @@ const expenseCategories = {
   'GASOLINA': { icon: 'fa-gas-pump', color: '#f97316' },
   'IMPREVISTOS': { icon: 'fa-triangle-exclamation', color: '#dc2626' },
   'MANTENIMIENTO VEHICULAR': { icon: 'fa-car', color: '#3b82f6' },
+  'PENSIÓN DE JULIO': { icon: 'fa-child', color: '#e11d48' },
+  'PRÉSTAMOS': { icon: 'fa-file-invoice-dollar', color: '#7c3aed' },
   'REGALOS': { icon: 'fa-gift', color: '#ec4899' },
   'RESTAURANTES': { icon: 'fa-utensils', color: '#f59e0b' },
   'SNACKS/BEBIDAS': { icon: 'fa-mug-hot', color: '#10b981' },
@@ -339,12 +356,13 @@ const expenseCategories = {
   'SERVICIOS BÁSICOS': { icon: 'fa-bolt', color: '#fbbf24' },
   'OTROS': { icon: 'fa-box', color: '#6b7280' }
 };
-const VIVID = ['#f43f5e','#8b5cf6','#06b6d4','#f59e0b','#10b981','#3b82f6','#ec4899','#84cc16','#f97316','#14b8a6','#a855f7','#eab308','#0ea5e9','#ef4444','#22c55e','#6366f1'];
+const VIVID = ['#f43f5e','#8b5cf6','#06b6d4','#f59e0b','#10b981','#3b82f6','#ec4899','#84cc16','#f97316','#14b8a6','#a855f7','#eab308','#0ea5e9','#ef4444','#22c55e','#6366f1','#7c3aed','#e11d48'];
 
 const VOICE_INCOME = ['cobré','cobre','recibí','recibi','gané','gane','vendí','vendi','me pagaron','me dieron','ingreso'];
 const VOICE_EXPENSE = ['gasté','gaste','pagué','pague','compré','compre','saqué','saque','perdí','perdi','gasto'];
 const VOICE_CATS = [
-  ['PRÉSTAMO',['préstamo','prestamo']],
+  ['PRÉSTAMOS',['préstamo','prestamo','cuota']],
+  ['PENSIÓN DE JULIO',['pensión','pension']],
   ['SALARIO',['salario','sueldo','quincena']],
   ['VENTAS',['venta','vendí','vendi']],
   ['COMPRAS',['compra','compras','ropa','zapatos']],
@@ -376,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('transactionForm').addEventListener('submit', e => { e.preventDefault(); saveTransaction(); });
   document.getElementById('transactionModal').addEventListener('click', e => { if (e.target.id === 'transactionModal') closeModal(); });
   renderAll();
+  waitForGoogle();
 });
 
 function loadSettings(){
@@ -384,10 +403,132 @@ function loadSettings(){
   document.getElementById('cutOffDay').textContent = `Día ${settings.cutOffDay}`;
 }
 
+// ==================== GOOGLE DRIVE ====================
+function waitForGoogle(){
+  if (window.google && google.accounts && google.accounts.oauth2) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      error_callback: err => setSyncStatus('Google no abrió la ventana: ' + (err.type || err.message || err), 'err'),
+      callback: async resp => {
+        if (resp.error) return setSyncStatus('Error de Google: ' + resp.error + ' ' + (resp.error_description || ''), 'err');
+        accessToken = resp.access_token;
+        try { await loadFromDrive(); }
+        catch (e) { setSyncStatus('Error al leer Drive: ' + e.message, 'err'); }
+      }
+    });
+    setSyncStatus('Sin conexión a Drive · pulsa Conectar', '');
+  } else {
+    setTimeout(waitForGoogle, 300);
+  }
+}
+
+function connectDrive(){
+  if (!tokenClient) return setSyncStatus('Google aún está cargando, espera unos segundos y vuelve a tocar el botón', 'err');
+  setSyncStatus('Abriendo ventana de Google...', '');
+  try {
+    tokenClient.requestAccessToken({ prompt: accessToken ? '' : 'consent' });
+  } catch (e) {
+    setSyncStatus('Error al conectar: ' + e.message, 'err');
+  }
+}
+
+function setSyncStatus(msg, cls){
+  const el = document.getElementById('syncStatus');
+  el.textContent = msg;
+  el.className = 'sync-status ' + (cls || '');
+}
+
+async function driveFetch(url, opts = {}){
+  const res = await fetch(url, {
+    ...opts,
+    headers: { Authorization: 'Bearer ' + accessToken, ...(opts.headers || {}) }
+  });
+  if (res.status === 401) {
+    accessToken = null;
+    throw new Error('sesión vencida, pulsa Conectar otra vez');
+  }
+  if (!res.ok) {
+    let detalle = '';
+    try { detalle = (await res.json()).error.message; } catch(e) {}
+    throw new Error('HTTP ' + res.status + (detalle ? ' - ' + detalle : ''));
+  }
+  return res;
+}
+
+async function findDriveFile(){
+  const q = encodeURIComponent(`name='${DRIVE_FILE}' and trashed=false`);
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`);
+  const j = await r.json();
+  return j.files && j.files[0] ? j.files[0].id : null;
+}
+
+function payload(){
+  return { transactions, settings, updated: Date.now() };
+}
+
+async function createDriveFile(){
+  const boundary = 'finanzas_boundary_2026';
+  const meta = { name: DRIVE_FILE, mimeType: 'application/json' };
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(payload())}\r\n` +
+    `--${boundary}--`;
+  const r = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  driveFileId = (await r.json()).id;
+}
+
+async function loadFromDrive(){
+  setSyncStatus('Buscando finanzas.json en Drive...', '');
+  driveFileId = await findDriveFile();
+  if (!driveFileId) {
+    setSyncStatus('Creando finanzas.json en Drive...', '');
+    await createDriveFile();
+    setSyncStatus('✅ Archivo finanzas.json creado en Drive · ' + horaActual(), 'ok');
+    return;
+  }
+  const r = await driveFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+  const data = await r.json();
+  transactions = data.transactions || [];
+  if (data.settings) { settings = data.settings; localStorage.setItem('settings', JSON.stringify(settings)); loadSettings(); }
+  localStorage.setItem('transactions', JSON.stringify(transactions));
+  renderAll();
+  setSyncStatus('✅ Sincronizado con Drive · ' + horaActual(), 'ok');
+}
+
+async function pushToDrive(){
+  if (!accessToken) return;
+  if (!driveFileId) return createDriveFile();
+  await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload())
+  });
+}
+
+function persist(){
+  localStorage.setItem('transactions', JSON.stringify(transactions));
+  localStorage.setItem('settings', JSON.stringify(settings));
+  if (!accessToken) return setSyncStatus('Guardado solo en este dispositivo · conecta Drive', '');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    pushToDrive()
+      .then(() => setSyncStatus('✅ Guardado en Drive · ' + horaActual(), 'ok'))
+      .catch(e => setSyncStatus('Error al guardar en Drive: ' + e.message, 'err'));
+  }, 600);
+}
+
+function horaActual(){
+  return new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+}
+
 // ==================== FECHAS Y CICLOS ====================
 function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-// Ciclo que empieza en el día de corte de (startY, startM) y termina el día antes del corte siguiente
 function cycleOf(startY, startM){
   const c = settings.cutOffDay;
   const start = new Date(startY, startM, c);
@@ -396,7 +537,6 @@ function cycleOf(startY, startM){
   return { start: ymd(start), end: ymd(endIncl), startDate: start, endDate: next };
 }
 
-// Ciclo que contiene una fecha
 function cutPeriod(refDate){
   const c = settings.cutOffDay;
   let y = refDate.getFullYear(), m = refDate.getMonth();
@@ -569,14 +709,14 @@ function saveTransaction(){
     transactions.push(data);
     notify('✅ Movimiento guardado');
   }
-  localStorage.setItem('transactions', JSON.stringify(transactions));
+  persist();
   closeModal();
   renderAll();
 }
 function deleteTransaction(id){
   if (!confirm('¿Eliminar este movimiento?')) return;
   transactions = transactions.filter(t => t.id !== id);
-  localStorage.setItem('transactions', JSON.stringify(transactions));
+  persist();
   renderAll();
   notify('🗑️ Movimiento eliminado');
 }
@@ -621,7 +761,6 @@ function renderHistory(r){
     : '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-light)">No hay movimientos en este ciclo.</td></tr>';
 }
 
-// Fila: Día | Categoría | Detalle | Monto [| acciones]
 function rowHTML(tx, actions = false){
   const cats = tx.type === 'income' ? incomeCategories : expenseCategories;
   const c = cats[tx.category] || { icon: 'fa-box', color: '#6b7280' };
@@ -648,7 +787,6 @@ function renderDonut(r){
   const colors = labels.map((_, i) => VIVID[i % VIVID.length]);
 
   document.getElementById('donutTotal').textContent = `S/ ${total.toFixed(2)}`;
-  activeLegendIdx = null;
 
   if (categoryChart) categoryChart.destroy();
   categoryChart = new Chart(document.getElementById('categoryChart'), {
@@ -670,9 +808,10 @@ function renderDonut(r){
       <div class="legend-left"><span class="legend-dot" style="background:${colors[i]}"></span>${l}</div>
       <div class="legend-right"><b>${pct}%</b>S/ ${values[i].toFixed(2)}</div></div>`;
   }).join('') : '<p style="text-align:center;color:var(--text-light);padding:15px">Sin gastos en este ciclo</p>';
+
+  highlightSelected();
 }
 
-// Al tocar una categoría (dona o leyenda): se guarda el filtro y se resalta
 function selectCategoryFilter(name){
   selectedCategory = selectedCategory === name ? null : name;
   highlightSelected();
@@ -682,19 +821,19 @@ function selectCategoryFilter(name){
 function highlightSelected(){
   if (!categoryChart) return;
   const labels = categoryChart.data.labels;
-  const idx = selectedCategory === null ? null : labels.indexOf(selectedCategory);
+  const idx = selectedCategory === null ? -1 : labels.indexOf(selectedCategory);
   const ds = categoryChart.data.datasets[0];
   ds.backgroundColor = ds.data.map((_, j) => {
     const base = VIVID[j % VIVID.length];
-    return (idx === null || j === idx) ? base : base + '40';
+    return (idx === -1 || j === idx) ? base : base + '40';
   });
   categoryChart.update();
   document.querySelectorAll('.legend-item').forEach((el, j) => {
     el.classList.toggle('active', j === idx);
-    el.classList.toggle('dim', idx !== null && j !== idx);
+    el.classList.toggle('dim', idx !== -1 && j !== idx);
   });
   const total = ds.data.reduce((s,v) => s + v, 0);
-  document.getElementById('donutTotal').textContent = idx === null
+  document.getElementById('donutTotal').textContent = idx === -1
     ? `S/ ${total.toFixed(2)}`
     : `S/ ${ds.data[idx].toFixed(2)}`;
 }
@@ -705,7 +844,6 @@ function clearCategoryFilter(){
   renderCategoryDetail(getRange());
 }
 
-// Movimientos de la categoría seleccionada, debajo de Ingresos vs gastos
 function renderCategoryDetail(r){
   const card = document.getElementById('catDetailCard');
   if (!selectedCategory) { card.style.display = 'none'; return; }
@@ -727,7 +865,6 @@ function renderCategoryDetail(r){
     : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">Sin movimientos en este ciclo.</td></tr>';
 }
 
-// Últimos 6 ciclos terminando en el que se está viendo
 function renderTrend(){
   const cycles = [];
   for (let i = 5; i >= 0; i--) {
@@ -765,15 +902,15 @@ function showTab(name){
 function saveSettings(){
   settings.cutOffDay = Math.min(28, Math.max(1, parseInt(document.getElementById('cutOffInput').value) || 17));
   settings.budget = parseFloat(document.getElementById('budgetInput').value) || 2000;
-  localStorage.setItem('settings', JSON.stringify(settings));
   loadSettings();
+  persist();
   renderAll();
   notify('✅ Configuración guardada');
 }
 function clearAllData(){
   if (!confirm('¿Borrar TODOS los datos? No se puede deshacer.')) return;
   transactions = [];
-  localStorage.setItem('transactions', '[]');
+  persist();
   renderAll();
   notify('🗑️ Datos eliminados');
 }
