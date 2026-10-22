@@ -137,6 +137,16 @@ th.r,td.r{text-align:right}
 .tab-content{display:none}
 .tab-content.active{display:block}
 .notification{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:25px;z-index:3000;font-size:14px;font-weight:600;max-width:90%;text-align:center}
+
+/* Ventana para exigir conexión */
+.gate{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;align-items:center;justify-content:center;padding:20px}
+.gate.active{display:flex}
+.gate-box{background:#fff;border-radius:20px;max-width:360px;width:100%;padding:28px 24px;text-align:center}
+.gate-box i.big{font-size:44px;color:var(--primary);margin-bottom:12px}
+.gate-box h3{font-size:18px;color:var(--text);margin-bottom:8px}
+.gate-box p{font-size:14px;color:var(--text-light);line-height:1.5;margin-bottom:16px}
+.gate-box .btn-save{margin-top:0}
+.gate-box .gate-close{background:none;border:none;color:var(--text-light);font-size:13px;margin-top:12px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -274,11 +284,22 @@ th.r,td.r{text-align:right}
       <h3><i class="fas fa-file-import"></i> Importar desde Excel</h3>
       <p style="font-size:12px;color:var(--text-light);margin-bottom:12px">Columnas: <b>Fecha</b>, <b>Monto</b>, <b>Tipo</b> (Gasto/Ingreso), <b>Categoría</b>, <b>Detalle</b>. Los movimientos se agregan a los que ya tienes.</p>
       <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event)">
-      <button class="btn-save" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i> Elegir archivo Excel</button>
+      <button class="btn-save" onclick="requireConnection(() => document.getElementById('importFile').click())"><i class="fas fa-upload"></i> Elegir archivo Excel</button>
     </div>
     <div class="card">
       <button class="btn-save" style="background:var(--danger);margin-top:0" onclick="clearAllData()"><i class="fas fa-trash"></i> Borrar todos los datos</button>
     </div>
+  </div>
+</div>
+
+<!-- Ventana emergente: exige conexión a Drive para registrar -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <i class="fas fa-cloud-arrow-up big"></i>
+    <h3>Conecta tu Google Drive</h3>
+    <p>Para registrar movimientos primero debes conectar tu cuenta de Google. Así tus datos se guardan en tu Drive y no se pierden.</p>
+    <button class="btn-save" onclick="gateConnect()"><i class="fab fa-google"></i> Conectar con Google</button>
+    <button class="gate-close" onclick="closeGate()">Cancelar</button>
   </div>
 </div>
 
@@ -315,7 +336,7 @@ th.r,td.r{text-align:right}
 
 <div class="bottom-nav">
   <div class="nav-item active" data-tab="home" onclick="showTab('home')"><i class="fas fa-home"></i><span>Inicio</span></div>
-  <div class="nav-item" data-tab="add" onclick="openModal('expense')"><i class="fas fa-plus-circle"></i><span>Agregar</span></div>
+  <div class="nav-item" data-tab="add" onclick="requireConnection(() => openModal('expense'))"><i class="fas fa-plus-circle"></i><span>Agregar</span></div>
   <div class="nav-item" data-tab="history" onclick="showTab('history')"><i class="fas fa-list"></i><span>Movimientos</span></div>
   <div class="nav-item" data-tab="stats" onclick="showTab('stats')"><i class="fas fa-chart-bar"></i><span>Stats</span></div>
   <div class="nav-item" data-tab="settings" onclick="showTab('settings')"><i class="fas fa-cog"></i><span>Ajustes</span></div>
@@ -335,6 +356,7 @@ let categoryChart = null, trendChart = null, recognition = null, isListening = f
 let selectedCategory = null;
 let viewYear = null, viewMonth = null;
 let tokenClient = null, accessToken = null, driveFileId = null, saveTimer = null;
+let pendingAction = null;
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -398,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initVoice();
   document.getElementById('txDate').valueAsDate = new Date();
   renderCategories('expense');
-  document.getElementById('transactionForm').addEventListener('submit', e => { e.preventDefault(); saveTransaction(); });
+  document.getElementById('transactionForm').addEventListener('submit', e => { e.preventDefault(); if (requireConnection()) saveTransaction(); });
   document.getElementById('transactionModal').addEventListener('click', e => { if (e.target.id === 'transactionModal') closeModal(); });
   renderAll();
   setConnState(false);
@@ -408,6 +430,25 @@ document.addEventListener('DOMContentLoaded', () => {
 function loadSettings(){
   document.getElementById('cutOffInput').value = settings.cutOffDay;
   document.getElementById('cutOffDay').textContent = `Día ${settings.cutOffDay}`;
+}
+
+// ==================== CONEXIÓN OBLIGATORIA ====================
+// Devuelve true si hay sesión de Drive. Si no la hay, muestra la ventana y guarda la acción pendiente.
+function requireConnection(action){
+  if (accessToken) return action ? (action(), true) : true;
+  pendingAction = typeof action === 'function' ? action : null;
+  document.getElementById('gate').classList.add('active');
+  return false;
+}
+
+function closeGate(){
+  document.getElementById('gate').classList.remove('active');
+  pendingAction = null;
+}
+
+function gateConnect(){
+  document.getElementById('gate').classList.remove('active');
+  connectDrive();
 }
 
 // ==================== GOOGLE DRIVE ====================
@@ -431,6 +472,7 @@ function waitForGoogle(){
         setConnState(true);
         try { await loadFromDrive(); }
         catch (e) { setSyncStatus('Error al leer Drive: ' + e.message, 'err'); }
+        if (pendingAction) { const a = pendingAction; pendingAction = null; a(); }
       }
     });
     setSyncStatus('Sin conexión a Drive · pulsa Conectar', '');
@@ -700,6 +742,7 @@ function stopVoiceUI(){
   btn.innerHTML = '<i class="fas fa-microphone"></i> Registra un movimiento por voz';
 }
 function startVoiceRecognition(){
+  if (!requireConnection()) return;
   if (!recognition) return notify('⚠️ Voz no disponible en este navegador');
   if (isListening) return recognition.stop();
   try { recognition.start(); } catch(e){ notify('⚠️ Intenta de nuevo'); }
@@ -800,6 +843,7 @@ function saveTransaction(){
   renderAll();
 }
 function deleteTransaction(id){
+  if (!requireConnection()) return;
   if (!confirm('¿Eliminar este movimiento?')) return;
   transactions = transactions.filter(t => t.id !== id);
   persist();
@@ -856,7 +900,7 @@ function rowHTML(tx, actions = false){
   const det = `<div class="detail-cell" title="${(tx.note || '').replace(/"/g,'&quot;')}">${tx.note || '-'}</div>`;
   const monto = `<td class="r"><span class="amount-cell ${cls}">${sign} S/ ${tx.amount.toFixed(2)}</span></td>`;
   const actionsHTML = actions ? `<td>
-      <button class="btn-edit" onclick="openModal('${tx.type}', ${tx.id})"><i class="fas fa-edit"></i></button>
+      <button class="btn-edit" onclick="requireConnection(() => openModal('${tx.type}', ${tx.id}))"><i class="fas fa-edit"></i></button>
       <button class="btn-delete" onclick="deleteTransaction(${tx.id})"><i class="fas fa-trash"></i></button></td>` : '';
   return `<tr><td>${dia}</td><td>${cat}</td><td>${det}</td>${monto}${actionsHTML}</tr>`;
 }
@@ -945,7 +989,7 @@ function renderCategoryDetail(r){
         <td>${t.date.split('-')[2]}</td>
         <td><div class="detail-cell" title="${(t.note || '').replace(/"/g,'&quot;')}">${t.note || '-'}</div></td>
         <td class="r"><span class="amount-cell expense">- S/ ${t.amount.toFixed(2)}</span></td>
-        <td><button class="btn-edit" onclick="openModal('expense', ${t.id})"><i class="fas fa-edit"></i></button></td>
+        <td><button class="btn-edit" onclick="requireConnection(() => openModal('expense', ${t.id}))"><i class="fas fa-edit"></i></button></td>
       </tr>`).join('')
     : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-light)">Sin movimientos en este ciclo.</td></tr>';
 }
@@ -993,6 +1037,7 @@ function saveSettings(){
   notify('✅ Configuración guardada');
 }
 function clearAllData(){
+  if (!requireConnection()) return;
   if (!confirm('¿Borrar TODOS los datos? No se puede deshacer.')) return;
   transactions = [];
   persist();
