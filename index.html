@@ -34,16 +34,14 @@ body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh
 .main-balance{text-align:center;padding:25px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border-radius:15px;color:#fff;margin-bottom:15px}
 .main-balance h2{font-size:14px;opacity:.9;margin-bottom:10px}
 .main-balance .amount{font-size:34px;font-weight:bold}
-.sub-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.sub-card{padding:15px;border-radius:12px;text-align:center}
+.sub-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.sub-card{padding:15px 10px;border-radius:12px;text-align:center}
 .sub-card h3{font-size:12px;color:var(--text-light);margin-bottom:5px}
 .sub-card .amount{font-size:18px;font-weight:bold}
 .sub-card.income{background:#d4edda;border-left:4px solid #28a745}
 .sub-card.income .amount{color:#28a745}
 .sub-card.expense{background:#f8d7da;border-left:4px solid #dc3545}
 .sub-card.expense .amount{color:#dc3545}
-.sub-card.budget{background:#fff3cd;border-left:4px solid #ffc107}
-.sub-card.budget .amount{color:#d39e00}
 .sub-card.cut{background:#e0e7ff;border-left:4px solid var(--primary)}
 .sub-card.cut .amount{color:var(--primary);font-size:15px}
 
@@ -178,7 +176,6 @@ th.r,td.r{text-align:right}
       <div class="sub-cards">
         <div class="sub-card income"><h3>Ingresos</h3><div class="amount" id="totalIncome">S/ 0.00</div></div>
         <div class="sub-card expense"><h3>Gastos</h3><div class="amount" id="totalExpense">S/ 0.00</div></div>
-        <div class="sub-card budget"><h3>Presupuesto restante</h3><div class="amount" id="remainingBudget">S/ 0.00</div></div>
         <div class="sub-card cut"><h3>Corte</h3><div class="amount" id="cutOffDay">Día 17</div></div>
       </div>
     </div>
@@ -265,10 +262,6 @@ th.r,td.r{text-align:right}
         <label>Día de corte mensual (1-28)</label>
         <input type="number" id="cutOffInput" min="1" max="28" value="17">
       </div>
-      <div class="form-group">
-        <label>Presupuesto mensual (S/)</label>
-        <input type="number" id="budgetInput" value="2000">
-      </div>
       <button class="btn-save" onclick="saveSettings()"><i class="fas fa-save"></i> Guardar configuración</button>
     </div>
     <div class="card">
@@ -336,7 +329,7 @@ const DRIVE_FILE = 'finanzas.json';
 
 // ==================== DATOS ====================
 let transactions = JSON.parse(localStorage.getItem('transactions') || '[]');
-let settings = JSON.parse(localStorage.getItem('settings') || '{"cutOffDay":17,"budget":2000}');
+let settings = JSON.parse(localStorage.getItem('settings') || '{"cutOffDay":17}');
 let currentCategoryType = 'expense';
 let categoryChart = null, trendChart = null, recognition = null, isListening = false;
 let selectedCategory = null;
@@ -414,12 +407,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function loadSettings(){
   document.getElementById('cutOffInput').value = settings.cutOffDay;
-  document.getElementById('budgetInput').value = settings.budget;
   document.getElementById('cutOffDay').textContent = `Día ${settings.cutOffDay}`;
 }
 
 // ==================== GOOGLE DRIVE ====================
-// Indicador en la barra superior: "Conectado" (verde) o "Conectar" (gris)
 function setConnState(connected){
   const b = document.getElementById('connBtn');
   b.classList.toggle('on', connected);
@@ -835,7 +826,6 @@ function renderBalance(r){
   document.getElementById('totalIncome').textContent = `S/ ${income.toFixed(2)}`;
   document.getElementById('totalExpense').textContent = `S/ ${expense.toFixed(2)}`;
   document.getElementById('mainBalance').textContent = `S/ ${(income - expense).toFixed(2)}`;
-  document.getElementById('remainingBudget').textContent = `S/ ${(settings.budget - expense).toFixed(2)}`;
 }
 
 function sortedIn(r){
@@ -996,7 +986,7 @@ function showTab(name){
 // ==================== AJUSTES ====================
 function saveSettings(){
   settings.cutOffDay = Math.min(28, Math.max(1, parseInt(document.getElementById('cutOffInput').value) || 17));
-  settings.budget = parseFloat(document.getElementById('budgetInput').value) || 2000;
+  delete settings.budget;
   loadSettings();
   persist();
   renderAll();
