@@ -1,4 +1,4 @@
-<!DOCTYPE html><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -22,6 +22,9 @@ body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh
 .month-info{text-align:center;flex:1}
 .month-info strong{display:block;font-size:19px;color:var(--text)}
 .month-info small{font-size:11px;color:var(--text-light)}
+.month-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.conn-btn{border:none;border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;color:#fff;background:#9ca3af}
+.conn-btn.on{background:var(--success)}
 .custom-range{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .custom-range.active{display:grid}
 .custom-range input{width:100%;padding:10px;border:2px solid var(--border);border-radius:10px;font-size:13px}
@@ -147,13 +150,18 @@ th.r,td.r{text-align:right}
       <option value="month">Ciclo de facturación (corte día 17)</option>
       <option value="custom">Personalizado</option>
     </select>
-    <div class="month-nav" id="monthNav">
-      <button onclick="shiftMonth(-1)" aria-label="Ciclo anterior"><i class="fas fa-chevron-left"></i></button>
-      <div class="month-info">
-        <strong id="monthTitle">—</strong>
-        <small id="monthSub">—</small>
+    <div class="month-row">
+      <div class="month-nav" id="monthNav" style="flex:1">
+        <button onclick="shiftMonth(-1)" aria-label="Ciclo anterior"><i class="fas fa-chevron-left"></i></button>
+        <div class="month-info">
+          <strong id="monthTitle">—</strong>
+          <small id="monthSub">—</small>
+        </div>
+        <button onclick="shiftMonth(1)" aria-label="Ciclo siguiente"><i class="fas fa-chevron-right"></i></button>
       </div>
-      <button onclick="shiftMonth(1)" aria-label="Ciclo siguiente"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <button class="conn-btn" id="connBtn" onclick="connectDrive()"><i class="fas fa-cloud"></i> Conectar</button>
     </div>
     <div class="custom-range" id="customRange">
       <input type="date" id="customFrom" onchange="renderAll()">
@@ -400,6 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('transactionForm').addEventListener('submit', e => { e.preventDefault(); saveTransaction(); });
   document.getElementById('transactionModal').addEventListener('click', e => { if (e.target.id === 'transactionModal') closeModal(); });
   renderAll();
+  setConnState(false);
   waitForGoogle();
 });
 
@@ -410,6 +419,15 @@ function loadSettings(){
 }
 
 // ==================== GOOGLE DRIVE ====================
+// Indicador en la barra superior: "Conectado" (verde) o "Conectar" (gris)
+function setConnState(connected){
+  const b = document.getElementById('connBtn');
+  b.classList.toggle('on', connected);
+  b.innerHTML = connected
+    ? '<i class="fas fa-check"></i> Conectado'
+    : '<i class="fas fa-cloud"></i> Conectar';
+}
+
 function waitForGoogle(){
   if (window.google && google.accounts && google.accounts.oauth2) {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -419,6 +437,7 @@ function waitForGoogle(){
       callback: async resp => {
         if (resp.error) return setSyncStatus('Error de Google: ' + resp.error + ' ' + (resp.error_description || ''), 'err');
         accessToken = resp.access_token;
+        setConnState(true);
         try { await loadFromDrive(); }
         catch (e) { setSyncStatus('Error al leer Drive: ' + e.message, 'err'); }
       }
@@ -452,6 +471,7 @@ async function driveFetch(url, opts = {}){
   });
   if (res.status === 401) {
     accessToken = null;
+    setConnState(false);
     throw new Error('sesión vencida, pulsa Conectar otra vez');
   }
   if (!res.ok) {
@@ -533,12 +553,10 @@ function horaActual(){
 }
 
 // ==================== IMPORTAR EXCEL ====================
-// Normaliza texto para comparar categorías (sin tildes, mayúsculas)
 function norm(s){
   return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
 }
 
-// Convierte la fecha del Excel (serial, dd/mm/yyyy o yyyy-mm-dd) a yyyy-mm-dd
 function parseFecha(v){
   if (v instanceof Date) return ymd(v);
   if (typeof v === 'number') {
@@ -573,7 +591,6 @@ function importExcel(ev){
       const nuevos = [];
       let omitidos = 0;
       rows.forEach(row => {
-        // Busca columnas sin importar mayúsculas ni tildes
         const get = (...names) => {
           const key = Object.keys(row).find(k => names.includes(norm(k)));
           return key ? row[key] : '';
